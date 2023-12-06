@@ -19,7 +19,7 @@ func (g *Graph) add(n Node) {
 
 }
 
-func (g * Graph) addEdge(n1 Node, n2 Node) {
+func (g *Graph) addEdge(n1 *Node, n2 *Node) {
 
 }
 
