@@ -45,7 +45,7 @@ class kernelNode:
         self.count = count
         inNodes: list[memoryNode] = []
         outNodes: list[memoryNode] = []
-    
+    #updates input nodes with rewrite check
     def updateInNodes(self, nodes: list[memoryNode]):
         if self.debugInMod != True:
             for node in nodes:
@@ -53,7 +53,8 @@ class kernelNode:
             self.inNodes = True
         else:
             raise Exception("you updated in nodes more than once")
-
+        
+    #updates out nodes with rewrite check
     def updateOutNodes(self, nodes: list[memoryNode]):
         if self.debugOutMod != True:
             for node in nodes:
@@ -62,8 +63,10 @@ class kernelNode:
         else:
             raise Exception("you updated out nodes more than once")
 
-def generateNodes():
-    for msg in bt2.TraceCollectionMessageIterator('../testtraces'):
+#generates node from a path to CTF format traces
+def generateNodes(tracepath):
+    nodes = []
+    for msg in bt2.TraceCollectionMessageIterator(tracepath):
         if type(msg) is bt2._EventMessageConst:
             event = msg.event
             if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
@@ -74,7 +77,10 @@ def generateNodes():
                 stream = event['streamId']
                 size = event['count']
                 direction = event['cudaMemcpyKind']._value
+                #create node object and add to list
                 node = memoryNode(cid,time,src,dst,stream,size,direction)
+                nodes.append(node)
+                #debug prints
                 print(msg.event.name)
                 print(node.__dict__)
             if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
@@ -82,9 +88,19 @@ def generateNodes():
                 time = msg.default_clock_snapshot.value
                 stream = event['streamId']
                 threads = (event['blockDimX'] * event['blockDimY'] * event['blockDimZ']) * (event['gridDimX'] * event['gridDimY'] * event['gridDimZ']) 
+                #create node object and add to list
                 node = kernelNode(cid, time, stream, threads)
+                nodes.append(node)
+                #debug prints
                 print(msg.event.name)
                 print(node.__dict__)
+
+    if len(nodes) > 0 :
+        print('==============NODES GENERATED================')
+        return nodes
+    else:
+        raise Exception("Node generation failed or input is empty")
+                
 
 
 
@@ -95,5 +111,7 @@ def generateNodes():
 #testinglist.append(3)
 #print(testinglist)
 #testBehavtion(testinglist)
-                G = nx.Graph()
-generateNodes()
+G = nx.Graph()
+list = generateNodes('../testtraces')
+for node in list:
+    print(node.__dict__)
