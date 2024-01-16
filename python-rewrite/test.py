@@ -2,6 +2,7 @@ import bt2
 import json
 import pickle
 import datetime
+import networkx as nx
 
 class node:
     pass
@@ -68,6 +69,13 @@ def generateNodes():
             if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
                 cid = event['correlationId']
                 time = msg.default_clock_snapshot.value
+                stream = event['streamId']
+                threads = (event['blockDimX'] * event['blockDimY'] * event['blockDimZ']) * (event['gridDimX'] * event['gridDimY'] * event['gridDimZ']) 
+                node = kernelNode(cid, time, stream, threads)
+                print(msg.event.name)
+                print(node.__dict__)
+
+
 
 #def testBehavtion(list: list[int]):
     #list.clear()
@@ -76,4 +84,5 @@ def generateNodes():
 #testinglist.append(3)
 #print(testinglist)
 #testBehavtion(testinglist)
+                G = nx.Graph()
 generateNodes()
