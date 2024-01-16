@@ -35,6 +35,9 @@ class kernelNode:
     outNodes: list[memoryNode]
     stream: int
     count: int
+
+    debugInMod: bool = False
+    dubugOutMod: bool = False
     def __init__ (self, id, time, stream, count):
         self.id = id
         self.time = time
@@ -44,12 +47,20 @@ class kernelNode:
         outNodes: list[memoryNode] = []
     
     def updateInNodes(self, nodes: list[memoryNode]):
-        for node in nodes:
-            self.inNodes.append(memoryNode(node))
+        if self.debugInMod != True:
+            for node in nodes:
+                self.inNodes.append(memoryNode(node))
+            self.inNodes = True
+        else:
+            raise Exception("you updated in nodes more than once")
 
     def updateOutNodes(self, nodes: list[memoryNode]):
-        for node in nodes:
-            self.outNodes.append(memoryNode(node))
+        if self.debugOutMod != True:
+            for node in nodes:
+                self.outNodes.append(memoryNode(node))
+            self.outNodes = True
+        else:
+            raise Exception("you updated out nodes more than once")
 
 def generateNodes():
     for msg in bt2.TraceCollectionMessageIterator('../testtraces'):
