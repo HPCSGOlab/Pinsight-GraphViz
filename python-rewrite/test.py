@@ -19,7 +19,7 @@ class memoryNode:
         return cls(otherNode.id,otherNode.src)
 
     def __repr__(self) -> str:
-        return f"{hex(self.addr)}"
+        return f"{hex(self.addr)}i{self.id}"
     
 class kernelNode:
     id: int
@@ -70,15 +70,16 @@ def generateNodes(tracepath):
                 src = event['src']
                 dst = event['dst']
              
-                node = memoryNode(cid, src)
-                if not contains_allocaiton(nodes, node):
-                    nodes.append(node)
-                node = memoryNode(cid, dst)
-                if not contains_allocaiton(nodes, node):
-                    nodes.append(node)
+                node1 = memoryNode(cid, src)
+                if not containsAllocation(nodes, node1):
+                    nodes.append(node1)
+                node2 = memoryNode(cid, dst)
+                if not containsAllocation(nodes, node2):
+                    nodes.append(node2)
                 #debug prints
                 print(msg.event.name)
                 print(node.__dict__)
+
             if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
                 cid = event['correlationId']
                 time = msg.default_clock_snapshot.value
@@ -96,14 +97,80 @@ def generateNodes(tracepath):
         return nodes
     else:
         raise Exception("Node generation failed or input is empty")
+
+
+def generateNodesv2(tracepath, T):
+    nodes = []
+    preLaunch = []
+    postLaunch = []
+    previous_kernel = None
+
+    for msg in bt2.TraceCollectionMessageIterator(tracepath):
+        if type(msg) is bt2._EventMessageConst:
+            event = msg.event
+            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
+                cid = event['correlationId']
+                src = event['src']
+                dst = event['dst']
+                direction = event['cudaMemcpyKind']._value
+
+                node1 = memoryNode(cid, src)
+                if not containsAllocation(nodes, node1):
+                    T.add_node(node1)
+                node2 = memoryNode(cid, dst)
+                if not containsAllocation(nodes, node2):
+                    T.add_node(node2)
+                T.add_edge(node1, node2)
+               
+                if previous_kernel != None and direction == 2:
+                    T.add_edge(previous_kernel, node1)
+                elif direction == 1:
+                    preLaunch.append(node2)
+
+                #debug prints
+                print(msg.event.name)
                 
-def contains_allocaiton(list, node: memoryNode):
+            if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
+                cid = event['correlationId']
+                time = msg.default_clock_snapshot.value
+                stream = event['streamId']
+                threads = (event['blockDimX'] * event['blockDimY'] * event['blockDimZ']) * (event['gridDimX'] * event['gridDimY'] * event['gridDimZ']) 
+                #create node object and add to list
+                node = kernelNode(cid, time, stream, threads)
+                nodes.append(node)
+                T.add_node(node)
+                for mn in preLaunch:
+                    T.add_edge(mn, node)
+                preLaunch = []
+                previous_kernel = node
+
+                #debug prints
+                print(msg.event.name)
+                print(node.__dict__)
+    return T
+
+
+def generateEdges(tracepath, nodes, graph):
+    for msg in bt2.TraceCollectionMessageIterator(tracepath):
+        if type(msg) is bt2._EventMessageConst:
+            event = msg.event
+            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
+                cid = event['correlationId']
+                src = event['src']
+                dst = event['dst']
+                pass
+            if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
+                pass
+        
+def containsAllocation(list, node: memoryNode):
     for existingNode in list:
        if isinstance(existingNode, memoryNode):
             if existingNode.addr == node.addr:
                 return True
     return False
 
+def getAllocation(addr):
+    pass
 #def testBehavtion(list: list[int]):
     #list.clear()
 #testinglist = []
@@ -112,6 +179,5 @@ def contains_allocaiton(list, node: memoryNode):
 #print(testinglist)
 #testBehavtion(testinglist)
 G = nx.Graph()
-list = generateNodes('../testtraces')
-G.add_nodes_from(list)
+generateNodesv2('../testtraces', G)
 nx.nx_agraph.write_dot(G, './data.dot')
