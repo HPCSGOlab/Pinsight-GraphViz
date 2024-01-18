@@ -9,25 +9,18 @@ class node:
 
 class memoryNode:
     id: int
-    src: int
-    time: int
-    dst: int
-    stream: int
-    size: int
-    direction: int
-    def __init__(self, id, time, src, dst, stream, size, direction) -> None:
+    addr: int
+    def __init__(self, id, addr) -> None:
         self.id = id
-        self.time = time
-        self.src = src
-        self.dst = dst
-        self.stream = stream
-        self.size = size
-        self.direction = direction
-
+        self.addr = addr
+    
     @classmethod
     def fromNode (cls, otherNode):
-        return cls(otherNode.id,otherNode.src, otherNode.dst, otherNode.stream, otherNode.size)
+        return cls(otherNode.id,otherNode.src)
 
+    def __repr__(self) -> str:
+        return f"{hex(self.addr)}"
+    
 class kernelNode:
     id: int
     time: int
@@ -62,6 +55,9 @@ class kernelNode:
             self.outNodes = True
         else:
             raise Exception("you updated out nodes more than once")
+        
+    def __repr__(self) -> str:
+        return f"{self.id}"
 
 #generates node from a path to CTF format traces
 def generateNodes(tracepath):
@@ -71,15 +67,15 @@ def generateNodes(tracepath):
             event = msg.event
             if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
                 cid = event['correlationId']
-                time = msg.default_clock_snapshot.value
                 src = event['src']
                 dst = event['dst']
-                stream = event['streamId']
-                size = event['count']
-                direction = event['cudaMemcpyKind']._value
-                #create node object and add to list
-                node = memoryNode(cid,time,src,dst,stream,size,direction)
-                nodes.append(node)
+             
+                node = memoryNode(cid, src)
+                if not contains_allocaiton(nodes, node):
+                    nodes.append(node)
+                node = memoryNode(cid, dst)
+                if not contains_allocaiton(nodes, node):
+                    nodes.append(node)
                 #debug prints
                 print(msg.event.name)
                 print(node.__dict__)
@@ -101,8 +97,12 @@ def generateNodes(tracepath):
     else:
         raise Exception("Node generation failed or input is empty")
                 
-
-
+def contains_allocaiton(list, node: memoryNode):
+    for existingNode in list:
+       if isinstance(existingNode, memoryNode):
+            if existingNode.addr == node.addr:
+                return True
+    return False
 
 #def testBehavtion(list: list[int]):
     #list.clear()
@@ -114,4 +114,4 @@ def generateNodes(tracepath):
 G = nx.Graph()
 list = generateNodes('../testtraces')
 G.add_nodes_from(list)
-nx.draw(G)
+nx.nx_agraph.write_dot(G, './data.dot')
