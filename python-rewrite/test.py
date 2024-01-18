@@ -56,7 +56,7 @@ class kernelNode:
         
     #updates out nodes with rewrite check
     def updateOutNodes(self, nodes: list[memoryNode]):
-        if self.debugOutMod != True:
+        if self.debugOutMod == False:
             for node in nodes:
                 self.outNodes.append(memoryNode(node))
             self.outNodes = True
@@ -113,5 +113,5 @@ def generateNodes(tracepath):
 #testBehavtion(testinglist)
 G = nx.Graph()
 list = generateNodes('../testtraces')
-for node in list:
-    print(node.__dict__)
+G.add_nodes_from(list)
+nx.draw(G)
