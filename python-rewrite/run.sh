@@ -6,4 +6,4 @@ rm data
 python3 ./test.py
 
 #created png fromt DOt file
-dot -Tpng data -O
+dot -Tsvg data -O

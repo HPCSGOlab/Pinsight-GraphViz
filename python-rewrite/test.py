@@ -120,15 +120,15 @@ def generateNodesv2(tracepath, allocations, T):
     for msg in bt2.TraceCollectionMessageIterator(tracepath):
         if type(msg) is bt2._EventMessageConst:
             event = msg.event
-            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
-                '''
+            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+
+                #print(event.payload_field)
+                
                 cid = None
-                if 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
                     cid = 0
                 else:
-                    cid = event['correlationId']
-                
-                cid = event['correlationId']
+                    cid = event['correlationId'] 
                 src = event['src']
                 dst = event['dst']
                 direction = event['cudaMemcpyKind']._value
@@ -160,7 +160,8 @@ def generateNodesv2(tracepath, allocations, T):
                             T.add_edge(sourceNode, allocation)
                             sourceNode = None
                             break
-                '''
+                            
+                
             if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
                 cid = event['correlationId']
                 time = msg.default_clock_snapshot.value
@@ -172,8 +173,7 @@ def generateNodesv2(tracepath, allocations, T):
                     T.add_edge(mn, node)
                 previousKernal = node
                 preNodes = []
-                print(msg.event.name)
-                print(node.__dict__)
+             
     return T
 
 def generateAllocations(tracepath):
@@ -181,15 +181,14 @@ def generateAllocations(tracepath):
     for msg in bt2.TraceCollectionMessageIterator(tracepath):
         if type(msg) is bt2._EventMessageConst:
             event = msg.event
-            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
-            
-                '''
+            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name =='cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                print(event.payload_field)
+                #'''
                 cid = None
-                if 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
                     cid = 0
                 else:
                     cid = event['correlationId']
-
                 src = event['src']
                 dst = event['dst']
                 direction = event['cudaMemcpyKind']._value
@@ -199,7 +198,8 @@ def generateAllocations(tracepath):
                 else: 
                     attemptAdd(cid, src, 1, allocations)
                     attemptAdd(cid, dst, 0, allocations)
-                '''
+                    #'''
+                
 
     return allocations
 
@@ -219,7 +219,7 @@ def updateAllocation(addr, location, allocationsList):
     pass
 
 G = Graph(False, "box")
-allocations = generateAllocations('../testtraces')
-generateNodesv2('../testtraces', allocations, G)
+allocations = generateAllocations('../reductiontraces')
+generateNodesv2('../reductiontraces', allocations, G)
 print(G)
 G.write('./data')
