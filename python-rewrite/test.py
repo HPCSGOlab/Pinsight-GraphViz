@@ -82,7 +82,7 @@ class memoryNode:
         self.location = location
     @classmethod
     def fromNode (cls, otherNode):
-        return cls(otherNode.id,otherNode.src)
+        return cls(otherNode.id,otherNode.src, otherNode.location)
     def updated(self):
         self.iteration += 1;
     def __str__(self) -> str:
@@ -108,23 +108,6 @@ class kernelNode:
         self.count = count
         inNodes: list[memoryNode] = []
         outNodes: list[memoryNode] = []
-    #updates input nodes with rewrite check
-    def updateInNodes(self, nodes: list[memoryNode]):
-        if self.debugInMod != True:
-            for node in nodes:
-                self.inNodes.append(memoryNode(node))
-            self.inNodes = True
-        else:
-            raise Exception("you updated in nodes more than once")
-        
-    #updates out nodes with rewrite check
-    def updateOutNodes(self, nodes: list[memoryNode]):
-        if self.debugOutMod == False:
-            for node in nodes:
-                self.outNodes.append(memoryNode(node))
-            self.outNodes = True
-        else:
-            raise Exception("you updated out nodes more than once")
         
     def __repr__(self) -> str:
         return f"k{self.id}"
@@ -137,7 +120,14 @@ def generateNodesv2(tracepath, allocations, T):
     for msg in bt2.TraceCollectionMessageIterator(tracepath):
         if type(msg) is bt2._EventMessageConst:
             event = msg.event
-            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
+            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                '''
+                cid = None
+                if 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                    cid = 0
+                else:
+                    cid = event['correlationId']
+                
                 cid = event['correlationId']
                 src = event['src']
                 dst = event['dst']
@@ -170,7 +160,7 @@ def generateNodesv2(tracepath, allocations, T):
                             T.add_edge(sourceNode, allocation)
                             sourceNode = None
                             break
-                
+                '''
             if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
                 cid = event['correlationId']
                 time = msg.default_clock_snapshot.value
@@ -191,8 +181,15 @@ def generateAllocations(tracepath):
     for msg in bt2.TraceCollectionMessageIterator(tracepath):
         if type(msg) is bt2._EventMessageConst:
             event = msg.event
-            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
-                cid = event['correlationId']
+            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+            
+                '''
+                cid = None
+                if 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                    cid = 0
+                else:
+                    cid = event['correlationId']
+
                 src = event['src']
                 dst = event['dst']
                 direction = event['cudaMemcpyKind']._value
@@ -202,6 +199,7 @@ def generateAllocations(tracepath):
                 else: 
                     attemptAdd(cid, src, 1, allocations)
                     attemptAdd(cid, dst, 0, allocations)
+                '''
 
     return allocations
 
@@ -220,7 +218,7 @@ def containsAllocation(list, node: memoryNode):
 def updateAllocation(addr, location, allocationsList):
     pass
 
-G = Graph(True, "box")
+G = Graph(False, "box")
 allocations = generateAllocations('../testtraces')
 generateNodesv2('../testtraces', allocations, G)
 print(G)
