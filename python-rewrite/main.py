@@ -121,7 +121,7 @@ class kernelNode:
         
     def __repr__(self) -> str:
         return f"k{self.id}"
-'''
+
 #generates and returns list of streams
 def generateStreams(tracepath, defaultStream):
     streams = []
@@ -304,7 +304,7 @@ def updateAllocation(addr, location, allocationsList):
 
 
 def main():
-    G = Graph(False, "box")
+    G = Graph(True, "box")
     tracepath = '../reductiontraces'
     data = generateAllocations(tracepath, 7)
     allocations = data[0]
@@ -312,6 +312,7 @@ def main():
     generateNodesv2(tracepath, allocations, streams, G)
     #print(G)
     G.write('./data')
+'''
 
 if __name__ == "__main__":
     main()
