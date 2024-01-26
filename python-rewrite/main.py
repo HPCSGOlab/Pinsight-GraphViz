@@ -1,8 +1,13 @@
+from operator import contains
 import bt2
 import json
 import pickle
 import datetime
 import networkx as nx
+import cProfile
+import re
+cProfile.run('re.compile("main()")')
+
 
 class Graph:
     opener = "digraph G{\n"
@@ -75,24 +80,27 @@ class memoryNode:
     addr: int
     location: int
     iteration: int
-    def __init__(self, id, addr, location) -> None:
+    stream: int
+    def __init__(self, id, addr, stream, location) -> None:
         self.id = id
         self.addr = addr
         self.iteration = 0
         self.location = location
+        self.stream = stream
     @classmethod
     def fromNode (cls, otherNode):
-        return cls(otherNode.id,otherNode.src, otherNode.location)
+        return cls(otherNode.id,otherNode.addr, otherNode.location, otherNode.stream)
     def updated(self):
-        self.iteration += 1;
+        self.iteration += 1
     def __str__(self) -> str:
         #return f"{hex(self.addr)}i{self.iter}"
-        return f"a{self.addr}i{self.iteration}"
+        return f"a{self.addr}i{self.iteration}c{self.id}"
     #def __str__(self):
         #return f"{self.addr} {self.location}"
     
 class kernelNode:
     id: int
+    devId: int
     time: int
     inNodes: list[memoryNode]
     outNodes: list[memoryNode]
@@ -101,29 +109,71 @@ class kernelNode:
 
     debugInMod: bool = False
     dubugOutMod: bool = False
-    def __init__ (self, id, time, stream, count):
+    def __init__ (self, id, devId, time, stream, count):
         self.id = id
+        self.devId = devId
         self.time = time
         self.stream = stream
         self.count = count
+
         inNodes: list[memoryNode] = []
         outNodes: list[memoryNode] = []
         
     def __repr__(self) -> str:
         return f"k{self.id}"
-
-
-def generateNodesv2(tracepath, allocations, T):
-    previousKernal = None
-    postNodes = []
-    preNodes = []
+'''
+#generates and returns list of streams
+def generateStreams(tracepath, defaultStream):
+    streams = []
+    streams.append(defaultStream)
     for msg in bt2.TraceCollectionMessageIterator(tracepath):
         if type(msg) is bt2._EventMessageConst:
             event = msg.event
             if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
+                    stream = event['streamId']._value
+                    if stream not in streams:
+                        streams.append(stream)
+            if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
+                stream = event['streamId']._value
+                if stream not in streams:
+                    streams.append(stream)
+    return streams
+tracepath = '../reductiontraces'
+streams = generateStreams(tracepath, 7)        
 
+def generateNodes(tracepath):
+    for msg in bt2.TraceCollectionMessageIterator(tracepath, streams):
+        if type(msg) is bt2._EventMessageConst:
+            event = msg.event
+            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                stream = streams[0]
+                if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
+                    stream = event['streamId']
+                cid = event['cid']
+
+                direction = event['cudaMemcpyKind']._value
+                if direction == 1:
+                    pass
+                elif direction == 2:
+                    pass
+                elif direction == 3:
+                    pass
+
+            if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
+                pass
+            
+'''
+def generateNodesv2(tracepath, allocations, streams, T):
+    previousKernal = None
+    postNodes = []
+    preNodes = []
+    lastNode = None
+    for msg in bt2.TraceCollectionMessageIterator(tracepath):
+        if type(msg) is bt2._EventMessageConst:
+            event = msg.event
+            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
                 #print(event.payload_field)
-                
                 cid = None
                 if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
                     cid = 0
@@ -132,9 +182,9 @@ def generateNodesv2(tracepath, allocations, T):
                 src = event['src']
                 dst = event['dst']
                 direction = event['cudaMemcpyKind']._value
-
+                
                 if direction == 2 and previousKernal != None:
-                    sourceNode = None;
+                    sourceNode = None
                     for allocation in allocations:
                         if allocation.addr == src and allocation.location == 1:
                             allocation.updated()
@@ -148,8 +198,8 @@ def generateNodesv2(tracepath, allocations, T):
                             sourceNode = None
                             break
 
-                if direction == 1:
-                    sourceNode = None;
+                elif direction == 1:
+                    sourceNode = None
                     for allocation in allocations:
                         if allocation.addr == src and allocation.location == 0:
                             sourceNode = allocation
@@ -160,51 +210,85 @@ def generateNodesv2(tracepath, allocations, T):
                             T.add_edge(sourceNode, allocation)
                             sourceNode = None
                             break
-                            
+                    #print(event.__dict__)
+                
+                elif direction == 3 and previousKernal != None:
+                    sourceNode = None
+                    for allocation in allocations:
+                        if allocation.addr == src and allocation.location == 1:
+                            allocation.updated()
+                            T.add_edge(previousKernal, allocation)
+                            sourceNode = allocation
+                            break
+                    for allocation in allocations:
+                        if allocation.addr == dst and allocation.location == 1:
+                            allocation.updated()
+                            preNodes.append(allocation)
+                            T.add_edge(sourceNode, allocation)
+                            sourceNode = None
+                            break
+                lastNode = None            
                 
             if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
                 cid = event['correlationId']
+                devId = event['devId']
                 time = msg.default_clock_snapshot.value
                 stream = event['streamId']
                 threads = (event['blockDimX'] * event['blockDimY'] * event['blockDimZ']) * (event['gridDimX'] * event['gridDimY'] * event['gridDimZ']) 
-                node = kernelNode(cid, time, stream, threads)
+                node = kernelNode(cid, devId, time, stream, threads)
                 #T.add_node(node)
                 for mn in preNodes:
                     T.add_edge(mn, node)
+
+                if isinstance(lastNode, kernelNode) and lastNode.stream == node.stream and lastNode.devId ==node.devId:
+                    T.add_edge(lastNode, node)
+                    pass
+                
                 previousKernal = node
+                lastNode = node
                 preNodes = []
              
     return T
 
-def generateAllocations(tracepath):
+def generateAllocations(tracepath, default_stream):
+    data = []
     allocations = []
+    streams = []
     for msg in bt2.TraceCollectionMessageIterator(tracepath):
         if type(msg) is bt2._EventMessageConst:
             event = msg.event
             if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name =='cupti_pinsight_lttng_ust:cudaMemcpy_begin':
-                print(event.payload_field)
-                #'''
-                cid = None
-                if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
-                    cid = 0
-                else:
-                    cid = event['correlationId']
+                stream = default_stream
+                if event.name =='cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
+                    stream = event['streamId']
+                if event['cudaMemcpyKind']._value == 3:
+                    pass
+                cid = event['correlationId']
                 src = event['src']
                 dst = event['dst']
                 direction = event['cudaMemcpyKind']._value
                 if direction == 1:
-                    attemptAdd(cid,src, 0, allocations)
-                    attemptAdd(cid,dst, 1, allocations)
+                    attemptAdd(src, 0, stream, allocations)
+                    attemptAdd(dst, 1, stream, allocations)
+                elif direction == 3:
+                    attemptAdd(src, 1, stream, allocations)
+                    attemptAdd(dst, 1, stream, allocations)
+                    pass
                 else: 
-                    attemptAdd(cid, src, 1, allocations)
-                    attemptAdd(cid, dst, 0, allocations)
-                    #'''
-                
+                    attemptAdd(src, 1, stream, allocations)
+                    attemptAdd(dst, 0, stream, allocations)
+                  
+            if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin' and event['streamId'] not in streams:
+                streams.append(event['streamId'])
+               
 
-    return allocations
+    data.append(allocations)
+    data.append(streams)
 
-def attemptAdd(cid, addr, location, allocationsList):
-    node = memoryNode(cid, addr, location)
+    return data
+
+def attemptAdd(addr, location, stream, allocationsList):
+    node = memoryNode(0, addr, stream, location)
     if not containsAllocation(allocationsList, node):
         allocationsList.append(node)
       
@@ -218,8 +302,16 @@ def containsAllocation(list, node: memoryNode):
 def updateAllocation(addr, location, allocationsList):
     pass
 
-G = Graph(False, "box")
-allocations = generateAllocations('../reductiontraces')
-generateNodesv2('../reductiontraces', allocations, G)
-print(G)
-G.write('./data')
+
+def main():
+    G = Graph(False, "box")
+    tracepath = '../reductiontraces'
+    data = generateAllocations(tracepath, 7)
+    allocations = data[0]
+    streams = data[1]
+    generateNodesv2(tracepath, allocations, streams, G)
+    #print(G)
+    G.write('./data')
+
+if __name__ == "__main__":
+    main()
