@@ -122,48 +122,6 @@ class kernelNode:
     def __repr__(self) -> str:
         return f"k{self.id}"
 
-#generates and returns list of streams
-def generateStreams(tracepath, defaultStream):
-    streams = []
-    streams.append(defaultStream)
-    for msg in bt2.TraceCollectionMessageIterator(tracepath):
-        if type(msg) is bt2._EventMessageConst:
-            event = msg.event
-            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
-                if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
-                    stream = event['streamId']._value
-                    if stream not in streams:
-                        streams.append(stream)
-            if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
-                stream = event['streamId']._value
-                if stream not in streams:
-                    streams.append(stream)
-    return streams
-tracepath = '../reductiontraces'
-streams = generateStreams(tracepath, 7)        
-
-def generateNodes(tracepath):
-    for msg in bt2.TraceCollectionMessageIterator(tracepath, streams):
-        if type(msg) is bt2._EventMessageConst:
-            event = msg.event
-            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
-                stream = streams[0]
-                if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
-                    stream = event['streamId']
-                cid = event['cid']
-
-                direction = event['cudaMemcpyKind']._value
-                if direction == 1:
-                    pass
-                elif direction == 2:
-                    pass
-                elif direction == 3:
-                    pass
-
-            if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
-                pass
-            
-'''
 def generateNodesv2(tracepath, allocations, streams, T):
     previousKernal = None
     postNodes = []
@@ -182,7 +140,7 @@ def generateNodesv2(tracepath, allocations, streams, T):
                 src = event['src']
                 dst = event['dst']
                 direction = event['cudaMemcpyKind']._value
-                
+                #DtH copy
                 if direction == 2 and previousKernal != None:
                     sourceNode = None
                     for allocation in allocations:
@@ -197,7 +155,7 @@ def generateNodesv2(tracepath, allocations, streams, T):
                             T.add_edge(sourceNode, allocation)
                             sourceNode = None
                             break
-
+                #HtD copy
                 elif direction == 1:
                     sourceNode = None
                     for allocation in allocations:
@@ -210,8 +168,7 @@ def generateNodesv2(tracepath, allocations, streams, T):
                             T.add_edge(sourceNode, allocation)
                             sourceNode = None
                             break
-                    #print(event.__dict__)
-                
+                #DtD copy
                 elif direction == 3 and previousKernal != None:
                     sourceNode = None
                     for allocation in allocations:
@@ -304,7 +261,7 @@ def updateAllocation(addr, location, allocationsList):
 
 
 def main():
-    G = Graph(True, "box")
+    G = Graph(False, "box")
     tracepath = '../reductiontraces'
     data = generateAllocations(tracepath, 7)
     allocations = data[0]
@@ -312,7 +269,6 @@ def main():
     generateNodesv2(tracepath, allocations, streams, G)
     #print(G)
     G.write('./data')
-'''
 
 if __name__ == "__main__":
     main()
