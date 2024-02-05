@@ -29,13 +29,13 @@ class deviceMemoryNode(memoryNode):
         super().__init__(id, addr)
         self.stream = stream
     def __repr__(self) -> str:
-        return f"DEVICE a{self.addr}i{self.iteration}s{self.stream}"
+        return f"z{self.addr}i{self.iteration}s{self.stream}"
     
 class hostMemoryNode(memoryNode):
     def __init__(self, id, addr):
         super().__init__(id, addr)
     def __repr__(self) -> str:
-        return f"HOST a{self.addr}i{self.iteration}"
+        return f"z{self.addr}i{self.iteration}"
 
 class kernelNode:
     id: int
@@ -43,7 +43,7 @@ class kernelNode:
     time: int
     stream: int
     count: int
-    def __init__ (self, id, devId, stream, count):
+    def __init__(self, id, devId, stream, count):
         self.id = id
         self.devId = devId
         
@@ -55,6 +55,12 @@ class kernelNode:
 class Pair():
     node1: memoryNode
     node2: memoryNode
+    def reset(self):
+        self.node1.iteration = 0
+        self.node2.iteration = 0
+    def updateNodes(self):
+        self.node1.iteration += 1
+        self.node2.iteration += 1
     def __init__ (self, node1, node2):
         self.node1 = node1
         self.node2 = node2
@@ -64,14 +70,20 @@ class Pair():
 class HtDPair(Pair):
     def _init__ (self, node1, node2):
         super().__init__(node1, node2)
+    def __repr__(self) -> str:
+        return f"HtD : {self.node1} ==> {self.node2}"
 
 class DtHPair(Pair):
     def __init__(self, node1, node2):
         super().__init__(node1, node2)
+    def __repr__(self) -> str:
+        return f"DtH : {self.node1} ==> {self.node2}"
 
 class DtDPair(Pair):
     def __init__(self, node1, node2):
         super().__init__(node1, node2)
+    def __repr__(self) -> str:
+        return f"DtD : {self.node1} ==> {self.node2}"
 
 class Graph:
     opener = "digraph G{\n"
@@ -88,7 +100,20 @@ class Graph:
         self.kernel_iterations = show_kernal_oterations
         pass
         
-    def add_pair_edge(self, pair: Pair):
+    def add_pair_edge(self, edge1, edge2):
+        if type(edge1) == Pair:
+            self.add_edge(edge1.node1, edge1.node2)
+        if type(edge2) == Pair:
+            self.add_edge(edge2.node1, edge2.node2)
+
+        if type(edge1) == Pair and type(edge2) == kernelNode:
+            pass
+        elif type(edge1) == kernelNode and type(edge2) == Pair:
+            pass
+        elif type(edge1) == Pair and type(edge2) == kernelNode:
+            pass
+        else:
+            raise Exception("Error while adding pair edge")
         pass
         
     def add_edge(self, edge1, edge2):
@@ -109,10 +134,10 @@ class Graph:
             self.body += f"{edge2} [label=k{edge2.id} color={self.kernel_color} shape={self.kernel_shape}];\n"
             self.body += f"{edge1} -> {edge2};\n"
         else:
-            raise Exception("Error whiel adding edge")
+            raise Exception("Error while adding edge")
 
     def getColor(self, node):
-        if node.location == 0:
+        if type(node) == hostMemoryNode:
             return self.host_alloc_color
         else:
             return self.device_alloc_color
@@ -123,6 +148,29 @@ class Graph:
         f.close()
     def __repr__(self):
         return self.opener + self.body + self.closer
+
+#resets the iterations on memory nodes
+def resetNodes(events):
+    for event in events:
+        if type(event) == Pair:
+            event.reset()
+
+#generates dependencies based on parsed events. returns a dependency grpah
+def generateDependencGraph(events, streams):
+    g = Graph()
+    for knownStream in streams:
+        previousKernel = None
+        preMemoryNodes = []
+        for event in events:
+            if type(event) == DtHPair and previousKernel != None:
+                event.updateNodes()
+                g.add_pair_edge(previousKernel, event)
+            if type(event) == HtDPair:
+                preMemoryNodes.append(event)
+
+        #reset to resimulate data from the beginning for each stram
+        resetNodes(events)
+    return g
 
 def generateStreams(tracepath):
     streams = []
