@@ -100,20 +100,8 @@ class Graph:
         self.kernel_iterations = show_kernal_oterations
         pass
         
-    def add_pair_edge(self, edge1, edge2):
-        if type(edge1) == Pair:
-            self.add_edge(edge1.node1, edge1.node2)
-        if type(edge2) == Pair:
-            self.add_edge(edge2.node1, edge2.node2)
-
-        if type(edge1) == Pair and type(edge2) == kernelNode:
-            pass
-        elif type(edge1) == kernelNode and type(edge2) == Pair:
-            pass
-        elif type(edge1) == Pair and type(edge2) == kernelNode:
-            pass
-        else:
-            raise Exception("Error while adding pair edge")
+    def add_pair_edge(self, pair: Pair):
+        self.add_edge(pair.node1, pair.node2)
         
     def add_edge(self, edge1, edge2):
         if isinstance(edge1, memoryNode) and isinstance(edge2, memoryNode):
