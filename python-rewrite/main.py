@@ -127,83 +127,84 @@ def generateNodesv2(tracepath, allocations, streams, T):
     postNodes = []
     preNodes = []
     lastNode = None
-    for msg in bt2.TraceCollectionMessageIterator(tracepath):
-        if type(msg) is bt2._EventMessageConst:
-            event = msg.event
-            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
-                #print(event.payload_field)
-                cid = None
-                if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
-                    cid = 0
-                else:
-                    cid = event['correlationId'] 
-                src = event['src']
-                dst = event['dst']
-                direction = event['cudaMemcpyKind']._value
-                #DtH copy
-                if direction == 2 and previousKernal != None:
-                    sourceNode = None
-                    for allocation in allocations:
-                        if allocation.addr == src and allocation.location == 1:
-                            allocation.updated()
-                            T.add_edge(previousKernal, allocation)
-                            sourceNode = allocation
-                            break
-                    for allocation in allocations:
-                        if allocation.addr == dst and allocation.location == 0:
-                            allocation.updated()
-                            T.add_edge(sourceNode, allocation)
-                            sourceNode = None
-                            break
-                #HtD copy
-                elif direction == 1:
-                    sourceNode = None
-                    for allocation in allocations:
-                        if allocation.addr == src and allocation.location == 0:
-                            sourceNode = allocation
-                            break
-                    for allocation in allocations:
-                        if allocation.addr == dst and allocation.location == 1:
-                            preNodes.append(allocation)
-                            T.add_edge(sourceNode, allocation)
-                            sourceNode = None
-                            break
-                #DtD copy
-                elif direction == 3 and previousKernal != None:
-                    sourceNode = None
-                    for allocation in allocations:
-                        if allocation.addr == src and allocation.location == 1:
-                            allocation.updated()
-                            T.add_edge(previousKernal, allocation)
-                            sourceNode = allocation
-                            break
-                    for allocation in allocations:
-                        if allocation.addr == dst and allocation.location == 1:
-                            allocation.updated()
-                            preNodes.append(allocation)
-                            T.add_edge(sourceNode, allocation)
-                            sourceNode = None
-                            break
-                lastNode = None            
-                
-            if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
-                cid = event['correlationId']
-                devId = event['devId']
-                time = msg.default_clock_snapshot.value
-                stream = event['streamId']
-                threads = (event['blockDimX'] * event['blockDimY'] * event['blockDimZ']) * (event['gridDimX'] * event['gridDimY'] * event['gridDimZ']) 
-                node = kernelNode(cid, devId, time, stream, threads)
-                #T.add_node(node)
-                for mn in preNodes:
-                    T.add_edge(mn, node)
+    for basetream in streams:
+        for msg in bt2.TraceCollectionMessageIterator(tracepath):
+            if type(msg) is bt2._EventMessageConst:
+                event = msg.event
+                if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                    #print(event.payload_field)
+                    cid = None
+                    if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                        cid = 0
+                    else:
+                        cid = event['correlationId'] 
+                    src = event['src']
+                    dst = event['dst']
+                    direction = event['cudaMemcpyKind']._value
+                    #DtH copy
+                    if direction == 2 and previousKernal != None:
+                        sourceNode = None
+                        for allocation in allocations:
+                            if allocation.addr == src and allocation.location == 1:
+                                allocation.updated()
+                                T.add_edge(previousKernal, allocation)
+                                sourceNode = allocation
+                                break
+                        for allocation in allocations:
+                            if allocation.addr == dst and allocation.location == 0:
+                                allocation.updated()
+                                T.add_edge(sourceNode, allocation)
+                                sourceNode = None
+                                break
+                    #HtD copy
+                    elif direction == 1:
+                        sourceNode = None
+                        for allocation in allocations:
+                            if allocation.addr == src and allocation.location == 0:
+                                sourceNode = allocation
+                                break
+                        for allocation in allocations:
+                            if allocation.addr == dst and allocation.location == 1:
+                                preNodes.append(allocation)
+                                T.add_edge(sourceNode, allocation)
+                                sourceNode = None
+                                break
+                    #DtD copy
+                    elif direction == 3 and previousKernal != None:
+                        sourceNode = None
+                        for allocation in allocations:
+                            if allocation.addr == src and allocation.location == 1:
+                                allocation.updated()
+                                T.add_edge(previousKernal, allocation)
+                                sourceNode = allocation
+                                break
+                        for allocation in allocations:
+                            if allocation.addr == dst and allocation.location == 1:
+                                allocation.updated()
+                                preNodes.append(allocation)
+                                T.add_edge(sourceNode, allocation)
+                                sourceNode = None
+                                break
+                    lastNode = None            
+                    
+                if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
+                    cid = event['correlationId']
+                    devId = event['devId']
+                    time = msg.default_clock_snapshot.value
+                    stream = event['streamId']
+                    threads = (event['blockDimX'] * event['blockDimY'] * event['blockDimZ']) * (event['gridDimX'] * event['gridDimY'] * event['gridDimZ']) 
+                    node = kernelNode(cid, devId, time, stream, threads)
+                    #T.add_node(node)
+                    for mn in preNodes:
+                        T.add_edge(mn, node)
 
-                if isinstance(lastNode, kernelNode) and lastNode.stream == node.stream and lastNode.devId ==node.devId:
-                    T.add_edge(lastNode, node)
-                    pass
-                
-                previousKernal = node
-                lastNode = node
-                preNodes = []
+                    if isinstance(lastNode, kernelNode) and lastNode.devId ==node.devId:
+                        T.add_edge(lastNode, node)
+                        pass
+                    
+                    previousKernal = node
+                    lastNode = node
+                    preNodes = []
              
     return T
 
@@ -262,7 +263,7 @@ def updateAllocation(addr, location, allocationsList):
 
 def main():
     G = Graph(False, "box")
-    tracepath = '../reductiontraces'
+    tracepath = '../luleshtraces'
     data = generateAllocations(tracepath, 7)
     allocations = data[0]
     streams = data[1]
