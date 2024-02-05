@@ -114,7 +114,6 @@ class Graph:
             pass
         else:
             raise Exception("Error while adding pair edge")
-        pass
         
     def add_edge(self, edge1, edge2):
         if isinstance(edge1, memoryNode) and isinstance(edge2, memoryNode):
