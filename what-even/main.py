@@ -151,7 +151,7 @@ def generateDependencGraph(events, streams):
         for event in events:
             if type(event) == DtHPair and previousKernel != None:
                 event.updateNodes()
-                g.add_pair_edge(previousKernel, event)
+                g.add_pair_edge(previousKernel)
             if type(event) == HtDPair:
                 preMemoryNodes.append(event)
 
