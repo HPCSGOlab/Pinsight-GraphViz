@@ -172,21 +172,12 @@ def generateStreams(tracepath):
                     streams.append(stream)
     return streams
 
-def generateAllocations(events):
-    allocations = []
-    for event in events:
-        if type(event) == HtDPair:
-            pass
-        if type(event) == DtHPair:
-            pass
-        if type(event) == DtDPair:
-            pass
+def generateAllocations():
+
     pass
 
 def containsAllocation(addr, location, allocations: list[memoryNode]):
-    for allocation in allocations:
-        if allocation.addr == addr and allocation.:
-            return True
+    pass
 
 def generateEvents(tracepath):
     events = []
