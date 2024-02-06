@@ -172,6 +172,22 @@ def generateStreams(tracepath):
                     streams.append(stream)
     return streams
 
+def generateAllocations(events):
+    allocations = []
+    for event in events:
+        if type(event) == HtDPair:
+            pass
+        if type(event) == DtHPair:
+            pass
+        if type(event) == DtDPair:
+            pass
+    pass
+
+def containsAllocation(addr, location, allocations: list[memoryNode]):
+    for allocation in allocations:
+        if allocation.addr == addr and allocation.:
+            return True
+
 def generateEvents(tracepath):
     events = []
     for msg in bt2.TraceCollectionMessageIterator(tracepath):
@@ -206,7 +222,7 @@ def generateFromKernelEvent(event, events):
 
 #checks to see if allocation exists in allocations list.
 #returns true of allocation exists, false otherwise
-def containsAllocation(addr, location, events):
+def containsEvent(addr, location, events):
     for allocation in events:
         if location == 0:
             if type(allocation) == hostMemoryNode and allocation.addr == addr:
@@ -221,21 +237,21 @@ def attemptAdd(cid, src, dst, cpytype, allocations, stream = DEFAULT_STREAM):
     node1 = None
     node2 = None
     if cpytype == 1:
-        if not containsAllocation(src, 0, allocations):
+        if not containsEvent(src, 0, allocations):
             node1 = hostMemoryNode(cid, src)
-        if not containsAllocation(dst, 1, allocations):
+        if not containsEvent(dst, 1, allocations):
             node2 = deviceMemoryNode(cid, dst, stream)
         return HtDPair(node1, node2)
     elif cpytype == 2:
-        if not containsAllocation(src, 1, allocations):
+        if not containsEvent(src, 1, allocations):
             node1 = deviceMemoryNode(cid, src, stream)
-        if not containsAllocation(dst, 0, allocations):
+        if not containsEvent(dst, 0, allocations):
             node2 = hostMemoryNode(cid, dst)
         return DtHPair(node1, node2)
     elif cpytype == 3:
-        if not containsAllocation(src, 1, allocations):
+        if not containsEvent(src, 1, allocations):
             node1 = deviceMemoryNode(cid, src, stream)
-        if not containsAllocation(dst, 1, allocations):
+        if not containsEvent(dst, 1, allocations):
             node2 = deviceMemoryNode(cid, dst, stream)
         return DtDPair(node1, node2)
     
