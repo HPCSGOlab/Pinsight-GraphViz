@@ -199,6 +199,8 @@ def generateFromMemoryEvent(event, events):
     src = event['src']
     dst = event['dst']
     cpytype = event['cudaMemcpyKind']._value
+
+    #try to add allocation to global scope allocations
     pair = attemptAdd(cid, src, dst, cpytype, events, stream)
     if pair != None:
         events.append(pair)
