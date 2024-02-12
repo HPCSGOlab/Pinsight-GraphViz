@@ -1,4 +1,5 @@
 from operator import contains
+from re import S
 from unittest.mock import DEFAULT
 import bt2
 import json
@@ -28,12 +29,16 @@ class deviceMemoryNode(memoryNode):
     def __init__(self, id, addr, stream):
         super().__init__(id, addr)
         self.stream = stream
+    def allocRepr(self) -> str:
+        return f"DEVICE {self.addr}"
     def __repr__(self) -> str:
         return f"z{self.addr}i{self.iteration}s{self.stream}"
     
 class hostMemoryNode(memoryNode):
     def __init__(self, id, addr):
         super().__init__(id, addr)
+    def allocRepr(self) -> str:
+        return f"HOST {self.addr}"
     def __repr__(self) -> str:
         return f"z{self.addr}i{self.iteration}"
 
@@ -172,12 +177,44 @@ def generateStreams(tracepath):
                     streams.append(stream)
     return streams
 
-def generateAllocations():
+def generateAllocations(tracepath):
+    allocations = {}
+    for msg in bt2.TraceCollectionMessageIterator(tracepath):
+        if type(msg) is bt2._EventMessageConst:
+            event = msg.event
+            stream = DEFAULT_STREAM
+            if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name == 'cupti_pinsight_lttng_ust:cudaMemcpy_begin':
+                eventType = event['cudaMemcpyKind']._value
+                if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
+                    stream = event['streamId']
+                if eventType == 1:
+                    alloc1 = hostMemoryNode(event['correlationId'], event['src'])
+                    alloc2 = deviceMemoryNode(event['correlationId'], event['dst'], stream)
+                    if alloc1.allocRepr not in allocations:
+                        allocations[alloc1.allocRepr()] = alloc1
+                    if alloc2.allocRepr not in allocations:
+                        allocations[alloc2.allocRepr()] = alloc2
 
-    pass
+                elif eventType == 2:
+                    alloc1 = deviceMemoryNode(event['correlationId'], event['src'], stream)
+                    alloc2 = hostMemoryNode(event['correlationId'], event['dst'])
+                    if alloc1.allocRepr not in allocations:
+                        allocations[alloc1.allocRepr()] = alloc1
+                    if alloc2.allocRepr not in allocations:
+                        allocations[alloc2.allocRepr()] = alloc2
+    
+                elif eventType == 3:
+                    alloc1 = deviceMemoryNode(event['correlationId'], event['src'], stream)
+                    alloc2 = deviceMemoryNode(event['correlationId'], event['dst'], stream)
+                    if alloc1.allocRepr not in allocations:
+                        allocations[alloc1.allocRepr()] = alloc1
+                    if alloc2.allocRepr not in allocations:
+                        allocations[alloc2.allocRepr()] = alloc2
+    return allocations
 
-def containsAllocation(addr, location, allocations: list[memoryNode]):
-    pass
+                
+
+
 
 def generateEvents(tracepath):
     events = []
@@ -205,8 +242,8 @@ def generateFromMemoryEvent(event, events):
     if pair != None:
         events.append(pair)
 
-#Adds a kernel event to events
 def generateFromKernelEvent(event, events):
+#Adds a kernel event to events
     for kernel in events:
         if type(kernel) == kernelNode and kernel.id == event['correlationId']:
             return    
@@ -265,5 +302,9 @@ def main():
         print(stream)
     for event in events:
         print(event)
+
+    allocs = generateAllocations(tracepath)
+    for alloc in allocs:
+        print(alloc)
 
 main()
