@@ -67,9 +67,6 @@ class Pair():
     def reset(self):
         self.node1.iteration = 0
         self.node2.iteration = 0
-    def updateNodes(self):
-        self.node1.iteration += 1
-        self.node2.iteration += 1
     def __init__ (self, node1=None, node2=None):
         if node1 != None and node2 != None:
             self.node1 = node1
@@ -80,18 +77,24 @@ class Pair():
         return f"{self.node1} ==> {self.node2}"
 
 class HtDPair(Pair):
+    def updateNodes(self):
+        self.node2.iteration += 1
     def _init__ (self, node1=None, node2=None):
         super().__init__(node1, node2)
     def __repr__(self) -> str:
         return f"HtD : {self.node1} ==> {self.node2}"
 
 class DtHPair(Pair):
+    def updateNodes(self):
+        self.node2.iteration += 1
     def __init__(self, node1=None, node2=None):
         super().__init__(node1, node2)
     def __repr__(self) -> str:
         return f"DtH : {self.node1} ==> {self.node2}"
 
 class DtDPair(Pair):
+    def updateNodes(self):
+        self.node2.iteration += 1
     def __init__(self, node1=None, node2=None):
         super().__init__(node1, node2)
     def __repr__(self) -> str:
@@ -161,9 +164,11 @@ def generateDependencGraph(events, streams):
         previousKernel = None
         preMemoryNodes = []
         for event in events:
+            event.updateNodes()
             if type(event) == DtHPair and previousKernel != None:
-                event.updateNodes()
-                g.add_pair_edge(previousKernel)
+                
+                g.add_edge(event.node1, event.node2)
+
             if type(event) == HtDPair:
                 preMemoryNodes.append(event)
 
