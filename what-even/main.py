@@ -151,7 +151,7 @@ class Graph:
 #resets the iterations on memory nodes
 def resetNodes(events):
     for event in events:
-        if type(event) == Pair:
+        if issubclass(type(event), Pair):
             event.reset()
 
 #generates dependencies based on parsed events. returns a dependency grpah
@@ -333,6 +333,7 @@ def main():
     allocs = generateAllocations(tracepath)
     print("========== allocations ==========")
 
+
     for alloc in allocs:
         print(alloc)
 
@@ -347,6 +348,23 @@ def main():
         #print(allocs[key])
 
     print("========== events ==========")
+    for event in events:
+        print(event)
+
+
+    for key in allocs:
+        allocs[key].updated()
+        #print(allocs[key])
+
+    print("========== events ==========")
+    for event in events:
+        print(event)
+
+
+    resetNodes(events)
+        #print(allocs[key])
+
+    print("==========(POST RESET) events ==========")
     for event in events:
         print(event)
 
