@@ -321,10 +321,7 @@ def attemptAdd(cid, src, dst, cpytype, events, allocations, stream = DEFAULT_STR
 
 #generate streams from the data
 #geneate dependencies
-
-def main():
-    tracepath = '../testtracesv2'
-
+def test(tracepath):
     streams = generateStreams(tracepath)
     print("========== streams ==========")
     for stream in streams:
@@ -367,5 +364,9 @@ def main():
     print("==========(POST RESET) events ==========")
     for event in events:
         print(event)
+def main():
+    tracepath = '../testtracesv2'
+    #test(tracepath)
+
 
 main()
