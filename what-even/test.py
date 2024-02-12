@@ -1,4 +1,7 @@
 
+import string
+
+
 class A:
     x: int
     y: int
@@ -18,9 +21,9 @@ class HoldsA:
         pass
 
 def printinfo():
-    print("global list")
-    for item in globalList:
-        print(item)
+    print("global dict")
+    for key in globalDict:
+        print(f"{key} {globalDict[key]}")
     print("holder")
     print(holder.point1)
     print(holder.point2)
@@ -30,11 +33,19 @@ def updateHolder():
 
 
 globalList = [A(1,2), A(3,4)]
+globalDict = {}
+globalDict['A'] = A(1,2)
+globalDict['B'] = A(3,4)
+
+
 
 holder = HoldsA()
-
-holder.point1 = globalList[0]
-holder.point2 = globalList[1]
+temp = globalDict.get('A')
+if temp != None:
+    holder.point1 = temp
+temp = globalDict.get('B')
+if temp != None:
+    holder.point2 = temp
 
 printinfo()
 

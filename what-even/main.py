@@ -23,6 +23,10 @@ class memoryNode:
         return cls(otherNode.id, otherNode.addr)
     def updated(self):
         self.iteration += 1
+    def allocRepr(self) -> str:
+        return f"GENERIC {self.addr}"
+    def __repr__(self) -> str:
+        return f"g{self.addr}"
 
 class deviceMemoryNode(memoryNode):
     stream: int
@@ -66,26 +70,29 @@ class Pair():
     def updateNodes(self):
         self.node1.iteration += 1
         self.node2.iteration += 1
-    def __init__ (self, node1, node2):
-        self.node1 = node1
-        self.node2 = node2
+    def __init__ (self, node1=None, node2=None):
+        if node1 != None and node2 != None:
+            self.node1 = node1
+            self.node2 = node2
+        elif (node1 != None and node2 == None) or (node1 == None and node2 != None):
+            raise Exception("Bad constructor parameters")
     def __repr__(self) -> str:
         return f"{self.node1} ==> {self.node2}"
 
 class HtDPair(Pair):
-    def _init__ (self, node1, node2):
+    def _init__ (self, node1=None, node2=None):
         super().__init__(node1, node2)
     def __repr__(self) -> str:
         return f"HtD : {self.node1} ==> {self.node2}"
 
 class DtHPair(Pair):
-    def __init__(self, node1, node2):
+    def __init__(self, node1=None, node2=None):
         super().__init__(node1, node2)
     def __repr__(self) -> str:
         return f"DtH : {self.node1} ==> {self.node2}"
 
 class DtDPair(Pair):
-    def __init__(self, node1, node2):
+    def __init__(self, node1=None, node2=None):
         super().__init__(node1, node2)
     def __repr__(self) -> str:
         return f"DtD : {self.node1} ==> {self.node2}"
@@ -212,23 +219,20 @@ def generateAllocations(tracepath):
                         allocations[alloc2.allocRepr()] = alloc2
     return allocations
 
-                
 
-
-
-def generateEvents(tracepath):
+def generateEvents(tracepath, allocations):
     events = []
     for msg in bt2.TraceCollectionMessageIterator(tracepath):
         if type(msg) is bt2._EventMessageConst:
             event = msg.event
             if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin' or event.name =='cupti_pinsight_lttng_ust:cudaMemcpy_begin':
-                generateFromMemoryEvent(event, events)
+                generateFromMemoryEvent(event, events, allocations)
             if event.name == 'cupti_pinsight_lttng_ust:cudaKernelLaunch_begin':
                 generateFromKernelEvent(event, events)
     return events
 
 #Adds a memory pair to the events from an event
-def generateFromMemoryEvent(event, events):
+def generateFromMemoryEvent(event, events, allocations):
     stream = DEFAULT_STREAM
     if event.name == 'cupti_pinsight_lttng_ust:cudaMemcpyAsync_begin':
         stream = event['streamId']
@@ -238,7 +242,7 @@ def generateFromMemoryEvent(event, events):
     cpytype = event['cudaMemcpyKind']._value
 
     #try to add allocation to global scope allocations
-    pair = attemptAdd(cid, src, dst, cpytype, events, stream)
+    pair = attemptAdd(cid, src, dst, cpytype, events, allocations,stream)
     if pair != None:
         events.append(pair)
 
@@ -263,27 +267,54 @@ def containsEvent(addr, location, events):
     return False
 
 #Returns a node pair based on copy type if it doesn't exist in events list
-def attemptAdd(cid, src, dst, cpytype, allocations, stream = DEFAULT_STREAM):
-    node1 = None
-    node2 = None
+def attemptAdd(cid, src, dst, cpytype, events, allocations, stream = DEFAULT_STREAM):
+    tempNode1 = None
+    tempNode2 = None
     if cpytype == 1:
-        if not containsEvent(src, 0, allocations):
-            node1 = hostMemoryNode(cid, src)
-        if not containsEvent(dst, 1, allocations):
-            node2 = deviceMemoryNode(cid, dst, stream)
-        return HtDPair(node1, node2)
+        pair = HtDPair()
+        if not containsEvent(src, 0, events):
+            tempNode1 = hostMemoryNode(cid, src)
+            if  tempNode1.allocRepr() not in allocations:
+                raise Exception("Allocation of address not preset in dictionary")
+            else:
+                pair.node1 = allocations.get(tempNode1.allocRepr())
+        if not containsEvent(dst, 1, events):
+            tempNode2 = deviceMemoryNode(cid, dst, stream)
+            if  tempNode2.allocRepr() not in allocations:
+                raise Exception("Allocation of address not preset in dictionary")
+            else:
+                pair.node2 = allocations.get(tempNode2.allocRepr())
+        return pair
     elif cpytype == 2:
-        if not containsEvent(src, 1, allocations):
-            node1 = deviceMemoryNode(cid, src, stream)
-        if not containsEvent(dst, 0, allocations):
-            node2 = hostMemoryNode(cid, dst)
-        return DtHPair(node1, node2)
+        pair = DtHPair()
+        if not containsEvent(src, 1, events):
+            tempNode1 = deviceMemoryNode(cid, src, stream)
+            if  tempNode1.allocRepr() not in allocations:
+                raise Exception("Allocation of address not preset in dictionary")
+            else:
+                pair.node1 = allocations.get(tempNode1.allocRepr())
+        if not containsEvent(dst, 0, events):
+            tempNode2 = hostMemoryNode(cid, dst)
+            if tempNode2.allocRepr() not in allocations:
+                raise Exception("Allocation of address not preset in dictionary")
+            else:
+                pair.node2 = allocations.get(tempNode2.allocRepr())
+        return pair
     elif cpytype == 3:
-        if not containsEvent(src, 1, allocations):
-            node1 = deviceMemoryNode(cid, src, stream)
-        if not containsEvent(dst, 1, allocations):
-            node2 = deviceMemoryNode(cid, dst, stream)
-        return DtDPair(node1, node2)
+        pair = DtDPair()
+        if not containsEvent(src, 1, events):
+            tempNode1 = deviceMemoryNode(cid, src, stream)
+            if tempNode1.allocRepr() not in allocations:
+                raise Exception("Allocation of address not preset in dictionary")
+            else:
+                pair.node1 = allocations.get(tempNode1.allocRepr())
+        if not containsEvent(dst, 1, events):
+            tempNode2 = deviceMemoryNode(cid, dst, stream)
+            if  tempNode2.allocRepr() not in allocations:
+                raise Exception("Allocation of address not preset in dictionary")
+            else:
+                pair.node2 = allocations.get(tempNode2.allocRepr())
+        return DtDPair(tempNode1, tempNode2)
     
 
 #create objects from data and add them to a list
@@ -291,20 +322,32 @@ def attemptAdd(cid, src, dst, cpytype, allocations, stream = DEFAULT_STREAM):
 #generate streams from the data
 #geneate dependencies
 
-
-
-
 def main():
     tracepath = '../testtracesv2'
+
     streams = generateStreams(tracepath)
-    events = generateEvents(tracepath)
+    print("========== streams ==========")
     for stream in streams:
         print(stream)
+
+    allocs = generateAllocations(tracepath)
+    print("========== allocations ==========")
+
+    for alloc in allocs:
+        print(alloc)
+
+    events = generateEvents(tracepath, allocs)
+    print("========== events ==========")
     for event in events:
         print(event)
 
-    allocs = generateAllocations(tracepath)
-    for alloc in allocs:
-        print(alloc)
+
+    for key in allocs:
+        allocs[key].updated()
+        #print(allocs[key])
+
+    print("========== events ==========")
+    for event in events:
+        print(event)
 
 main()
