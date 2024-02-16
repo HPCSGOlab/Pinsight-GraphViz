@@ -186,30 +186,52 @@ def generateDependencGraph(events, streams):
     g = Graph(False, 'rectangle')
     for knownStream in streams:
         previousKernel = None
+        lastEvent = None
         preMemoryNodes: list[Pair] = []
         for event in events:
-            if type(event) == kernelNode and event.stream == knownStream:
+            if type(event) == kernelNode and event.stream == knownStream and type(lastEvent) == kernelNode:
+                g.add_edge(lastEvent, event)
+                lastEvent = event
+                
+            elif type(event) == kernelNode and event.stream == knownStream:
                 for e in preMemoryNodes:
                     e.node2.iteration += 1
                     g.add_edge(e.node1, e.node2)
                     g.add_edge(e.node2, event)
                 preMemoryNodes.clear()
                 previousKernel = event
+                lastEvent = event
 
-            elif type(event) == DtHPair and previousKernel != None:
-                print("HUUUH")
-                event.updateNodes()
-                g.add_edge(previousKernel, event.node1)
-                g.add_edge(event.node1, event.node2)
-            elif type(event) == HtDPair:
-                print("HEEEH")
-                preMemoryNodes.append(event)
-            elif type(event)== DtDPair:
-                print("HAAAH")
-                if previousKernel != None:
+            if type(event) == DtHPair and previousKernel != None:
+                stream = -1
+                if type(event.node1) == deviceMemoryNode:
+                    stream = event.node1.stream
+                if stream == knownStream:
+                    print("HUUUH")
                     event.updateNodes()
                     g.add_edge(previousKernel, event.node1)
-                g.add_edge(event.node1, event.node2)
+                    g.add_edge(event.node1, event.node2)
+                    lastEvent = event
+
+            elif type(event) == HtDPair:
+                stream = -1
+                if type(event.node2) == deviceMemoryNode:
+                    stream = event.node2.stream
+                if stream == knownStream:
+                    print("HEEEH")
+                    preMemoryNodes.append(event)
+                    lastEvent = event
+
+            elif type(event)== DtDPair:
+                if type(event.node1) == deviceMemoryNode:
+                    stream = event.node1.stream
+                if stream == knownStream:
+                    print("HAAAH")
+                    if previousKernel != None:
+                        event.updateNodes()
+                        g.add_edge(previousKernel, event.node1)
+                    g.add_edge(event.node1, event.node2)
+                    lastEvent = event
 
         #reset to resimulate data from the beginning for each stram
         resetNodes(events)

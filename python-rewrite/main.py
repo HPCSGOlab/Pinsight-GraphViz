@@ -263,7 +263,7 @@ def updateAllocation(addr, location, allocationsList):
 
 def main():
     G = Graph(False, "box")
-    tracepath = '../luleshtraces'
+    tracepath = '../testtracesv2'
     data = generateAllocations(tracepath, 7)
     allocations = data[0]
     streams = data[1]
