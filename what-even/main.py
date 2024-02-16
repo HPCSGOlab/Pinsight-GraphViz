@@ -86,6 +86,7 @@ class HtDPair(Pair):
 
 class DtHPair(Pair):
     def updateNodes(self):
+        self.node1.iteration += 1
         self.node2.iteration += 1
     def __init__(self, node1=None, node2=None):
         super().__init__(node1, node2)
@@ -119,24 +120,47 @@ class Graph:
         self.add_edge(pair.node1, pair.node2)
         
     def add_edge(self, edge1, edge2):
-        if isinstance(edge1, memoryNode) and isinstance(edge2, memoryNode):
-            self.body += f"{edge1} [label=b{hex(edge1.addr)} color={self.getColor(edge1)}];"
-            self.body += f"{edge2} [label=b{hex(edge2.addr)} color={self.getColor(edge2)}];\n"
-            self.body += f"{edge1} -> {edge2};\n"
-        elif isinstance(edge1, kernelNode) and isinstance(edge2, memoryNode):
-            self.body += f"{edge1} [label=k{edge1.id} color={self.kernel_color} shape={self.kernel_shape}];"
-            self.body += f"{edge2} [label = b{hex(edge2.addr)} color={self.getColor(edge2)}];\n"
-            self.body += f"{edge1}-> {edge2};\n"
-        elif isinstance(edge1, memoryNode) and isinstance(edge2, kernelNode):
-            self.body += f"{edge1} [label=b{hex(edge1.addr)} color={self.getColor(edge1)}];"
-            self.body += f"{edge2} [label=k{edge2.id} color={self.kernel_color} shape={self.kernel_shape}];\n"
-            self.body += f"{edge1} -> {edge2};\n"
-        elif isinstance(edge1, kernelNode) and isinstance(edge2, kernelNode):
-            self.body += f"{edge1} [label=k{edge1.id} color={self.kernel_color} shape={self.kernel_shape}];"
-            self.body += f"{edge2} [label=k{edge2.id} color={self.kernel_color} shape={self.kernel_shape}];\n"
-            self.body += f"{edge1} -> {edge2};\n"
+        if (self.kernel_iterations == False):
+            if isinstance(edge1, memoryNode) and isinstance(edge2, memoryNode):
+                self.body += f"{edge1} [label=b{hex(edge1.addr)} color={self.getColor(edge1)}];"
+                self.body += f"{edge2} [label=b{hex(edge2.addr)} color={self.getColor(edge2)}];\n"
+                self.body += f"{edge1} -> {edge2};\n"
+            elif isinstance(edge1, kernelNode) and isinstance(edge2, memoryNode):
+                self.body += f"{edge1} [label=k{edge1.id} color={self.kernel_color} shape={self.kernel_shape}];"
+                self.body += f"{edge2} [label = b{hex(edge2.addr)} color={self.getColor(edge2)}];\n"
+                self.body += f"{edge1}-> {edge2};\n"
+            elif isinstance(edge1, memoryNode) and isinstance(edge2, kernelNode):
+                self.body += f"{edge1} [label=b{hex(edge1.addr)} color={self.getColor(edge1)}];"
+                self.body += f"{edge2} [label=k{edge2.id} color={self.kernel_color} shape={self.kernel_shape}];\n"
+                self.body += f"{edge1} -> {edge2};\n"
+            elif isinstance(edge1, kernelNode) and isinstance(edge2, kernelNode):
+                self.body += f"{edge1} [label=k{edge1.id} color={self.kernel_color} shape={self.kernel_shape}];"
+                self.body += f"{edge2} [label=k{edge2.id} color={self.kernel_color} shape={self.kernel_shape}];\n"
+                self.body += f"{edge1} -> {edge2};\n"
+            else:
+                raise Exception("Error while adding edge")
         else:
-            raise Exception("Error while adding edge")
+            if isinstance(edge1, memoryNode) and isinstance(edge2, memoryNode):
+                self.body += f"{edge1} [label=b{hex(edge1.addr)} color={self.getColor(edge1)}];"
+                self.body += f"{edge2} [label=b{hex(edge2.addr)} color={self.getColor(edge2)}];\n"
+                self.body += f"{edge1} -> {edge2};\n"
+            elif isinstance(edge1, kernelNode) and isinstance(edge2, memoryNode):
+                self.body += f"{edge2} [label = b{hex(edge2.addr)} color={self.getColor(edge2)}];\n"
+                for i in range(0, edge1.count):
+                    self.body += f"{edge1}vb{i} [label=k{edge1.id} color={self.kernel_color} shape={self.kernel_shape}];"
+                    self.body += f"{edge1}vb{i}-> {edge2};\n"
+            elif isinstance(edge1, memoryNode) and isinstance(edge2, kernelNode):
+                self.body += f"{edge1} [label=b{hex(edge1.addr)} color={self.getColor(edge1)}];"
+                for i in range(0, edge2.count):
+                    self.body += f"{edge2}vb{i} [label=k{edge2.id} color={self.kernel_color} shape={self.kernel_shape}];\n"
+                    self.body += f"{edge1} -> {edge2}vb{i};\n"
+            elif isinstance(edge1, kernelNode) and isinstance(edge2, kernelNode):
+                self.body += f"{edge1} [label=k{edge1.id} color={self.kernel_color} shape={self.kernel_shape}];"
+                self.body += f"{edge2} [label=k{edge2.id} color={self.kernel_color} shape={self.kernel_shape}];\n"
+                self.body += f"{edge1} -> {edge2};\n"
+            else:
+                raise Exception("Error while adding edge")
+            
 
     def getColor(self, node):
         if type(node) == hostMemoryNode:
@@ -159,21 +183,37 @@ def resetNodes(events):
 
 #generates dependencies based on parsed events. returns a dependency grpah
 def generateDependencGraph(events, streams):
-    g = Graph()
+    g = Graph(False, 'rectangle')
     for knownStream in streams:
         previousKernel = None
-        preMemoryNodes = []
+        preMemoryNodes: list[Pair] = []
         for event in events:
-            event.updateNodes()
-            if type(event) == DtHPair and previousKernel != None:
-                
-                g.add_edge(event.node1, event.node2)
+            if type(event) == kernelNode and event.stream == knownStream:
+                for e in preMemoryNodes:
+                    e.node2.iteration += 1
+                    g.add_edge(e.node1, e.node2)
+                    g.add_edge(e.node2, event)
+                preMemoryNodes.clear()
+                previousKernel = event
 
-            if type(event) == HtDPair:
+            elif type(event) == DtHPair and previousKernel != None:
+                print("HUUUH")
+                event.updateNodes()
+                g.add_edge(previousKernel, event.node1)
+                g.add_edge(event.node1, event.node2)
+            elif type(event) == HtDPair:
+                print("HEEEH")
                 preMemoryNodes.append(event)
+            elif type(event)== DtDPair:
+                print("HAAAH")
+                if previousKernel != None:
+                    event.updateNodes()
+                    g.add_edge(previousKernel, event.node1)
+                g.add_edge(event.node1, event.node2)
 
         #reset to resimulate data from the beginning for each stram
         resetNodes(events)
+    g.write('./data')
     return g
 
 def generateStreams(tracepath):
@@ -370,7 +410,11 @@ def test(tracepath):
     for event in events:
         print(event)
 def main():
-    tracepath = '../testtracesv2'
+    tracepath = '../luleshtraces'
+    streams = generateStreams(tracepath)
+    allocs = generateAllocations(tracepath)
+    events = generateEvents(tracepath, allocs)
+    g = generateDependencGraph(events, streams)
     #test(tracepath)
 
 
