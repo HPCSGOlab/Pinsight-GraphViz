@@ -310,7 +310,9 @@ def generateDependencGraphV2(name, events, streams):
                 if previousKernel != None:
                     event.updateNodes()
                     g.add_edge(previousKernel, event.node1)
-                g.add_edge(event.node1, event.node2)
+                    #THIS IS EXPIREMENTAL
+                preMemoryNodes.append(event)
+                #g.add_edge(event.node1, event.node2)
                 lastEvent = event
                 print(event)
                 print(f"last event: {lastEvent}")
@@ -524,9 +526,12 @@ def main():
         streams = generateStreams(tracepath)
         allocs = generateAllocations(tracepath)
         events = generateEvents(tracepath, allocs)
+        
         generateDependencGraphV2(str(path), events, streams)  
     #g = generateDependencGraph(events, streams)
-    
+        print("==================")
+        for event in events:
+            print(event)
   
    
     #test(tracepath)
