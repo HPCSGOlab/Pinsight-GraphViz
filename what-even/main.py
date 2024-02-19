@@ -252,6 +252,59 @@ def generateDependencGraph(events, streams):
     g.write('./data')
     return g
 
+
+def generateDependencGraphV2(events, streams):
+    streams.append(-1)
+    g = Graph(False, 'rectangle')
+    
+    previousKernel = None
+    lastEvent = None
+    preMemoryNodes: list[Pair] = []
+    for event in events:
+        if type(event) == kernelNode and type(lastEvent) == kernelNode:
+            g.add_edge(lastEvent, event)
+            lastEvent = event
+            print(event)
+            
+        elif type(event) == kernelNode:
+            for e in preMemoryNodes:
+                e.node2.iteration += 1
+                g.add_edge(e.node1, e.node2)
+                g.add_edge(e.node2, event)
+            preMemoryNodes.clear()
+            previousKernel = event
+            lastEvent = event
+            print(event)
+
+        if type(event) == DtHPair and previousKernel != None:
+            if type(event.node1) == deviceMemoryNode:
+                event.updateNodes()
+                g.add_edge(previousKernel, event.node1)
+                g.add_edge(event.node1, event.node2)
+                lastEvent = event
+                print(event)
+
+        elif type(event) == HtDPair:
+            if type(event.node2) == deviceMemoryNode:
+                preMemoryNodes.append(event)
+                lastEvent = event
+                print(event)
+
+
+        elif type(event)== DtDPair:
+            if type(event.node1) == deviceMemoryNode:
+                if previousKernel != None:
+                    event.updateNodes()
+                    g.add_edge(previousKernel, event.node1)
+                g.add_edge(event.node1, event.node2)
+                lastEvent = event
+                print(event)
+
+    #reset to resimulate data from the beginning for each stram
+    
+    g.write('./data')
+    return g
+
 def generateStreams(tracepath):
     streams = []
     #append default streams
@@ -453,7 +506,8 @@ def main():
 
     for event in events:
         print(event)
-    g = generateDependencGraph(events, streams)
+    #g = generateDependencGraph(events, streams)
+    g = generateDependencGraphV2(events, streams)
     #test(tracepath)
 
 
