@@ -1,6 +1,7 @@
 #!/bin/bash
 #cleanup old files
 rm data
+rm data.svg
 
 #python script genreates DOT file
 python3 ./main.py

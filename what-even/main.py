@@ -27,7 +27,8 @@ class memoryNode:
         return f"GENERIC {self.addr}"
     def __repr__(self) -> str:
         return f"g{self.addr}"
-
+    
+#might need to put stream in self representation
 class deviceMemoryNode(memoryNode):
     stream: int
     def __init__(self, id, addr, stream):
@@ -264,8 +265,10 @@ def generateDependencGraphV2(events, streams):
         if type(event) == kernelNode and type(lastEvent) == kernelNode:
             g.add_edge(lastEvent, event)
             lastEvent = event
+            previousKernel = event
             print(event)
-            
+            print(f"last event: {lastEvent}")
+            print(f"previous kernel: {previousKernel}")
         elif type(event) == kernelNode:
             for e in preMemoryNodes:
                 e.node2.iteration += 1
@@ -275,6 +278,8 @@ def generateDependencGraphV2(events, streams):
             previousKernel = event
             lastEvent = event
             print(event)
+            print(f"last event: {lastEvent}")
+            print(f"previous kernel: {previousKernel}")
 
         if type(event) == DtHPair and previousKernel != None:
             if type(event.node1) == deviceMemoryNode:
@@ -283,12 +288,16 @@ def generateDependencGraphV2(events, streams):
                 g.add_edge(event.node1, event.node2)
                 lastEvent = event
                 print(event)
+                print(f"last event: {lastEvent}")
+                print(f"previous kernel: {previousKernel}")
 
         elif type(event) == HtDPair:
             if type(event.node2) == deviceMemoryNode:
                 preMemoryNodes.append(event)
                 lastEvent = event
                 print(event)
+                print(f"last event: {lastEvent}")
+                print(f"previous kernel: {previousKernel}")
 
 
         elif type(event)== DtDPair:
@@ -299,6 +308,8 @@ def generateDependencGraphV2(events, streams):
                 g.add_edge(event.node1, event.node2)
                 lastEvent = event
                 print(event)
+                print(f"last event: {lastEvent}")
+                print(f"previous kernel: {previousKernel}")
 
     #reset to resimulate data from the beginning for each stram
     
@@ -499,13 +510,11 @@ def test(tracepath):
     for event in events:
         print(event)
 def main():
-    tracepath = '../streamtraces'
+    tracepath = '../luleshtraces'
     streams = generateStreams(tracepath)
     allocs = generateAllocations(tracepath)
     events = generateEvents(tracepath, allocs)
 
-    for event in events:
-        print(event)
     #g = generateDependencGraph(events, streams)
     g = generateDependencGraphV2(events, streams)
     #test(tracepath)
