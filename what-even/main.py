@@ -1,4 +1,4 @@
-from operator import contains
+from operator import concat, contains
 from re import S
 from unittest.mock import DEFAULT
 import bt2
@@ -7,7 +7,7 @@ import pickle
 import datetime
 import networkx as nx
 import cProfile
-
+import os
 
 DEFAULT_STREAM = 7
 class memoryNode:
@@ -112,7 +112,9 @@ class DtDPair(Pair):
         return f"DtD : {self.node1} ==> {self.node2}"
 
 class Graph:
-    opener = "digraph G{\n"
+    opener = "{\n"
+    type = "digraph"
+    name = "G"
     body = ""
     closer = "}"
     kernel_iterations = False
@@ -121,7 +123,8 @@ class Graph:
     device_alloc_color = "chartreuse3"
     host_alloc_color = "deepskyblue2"
     
-    def __init__(self,show_kernal_oterations=False, kernel_node_shape="ellipse"):
+    def __init__(self,name, show_kernal_oterations=False, kernel_node_shape="ellipse"):
+        self.name = name
         self.kernel_shape = kernel_node_shape
         self.kernel_iterations = show_kernal_oterations
         pass
@@ -178,9 +181,11 @@ class Graph:
         else:
             return self.device_alloc_color
 
-    def write(self, path):
-        f = open(path, "w")
-        f.write(f"{self.opener}{self.body}{self.closer}")
+    def write(self):
+        print(str(self.name))
+        fullpath = f'./{self.name}.dot'
+        f = open(fullpath, "w")
+        f.write(f"{self.type} {self.name}{self.opener}{self.body}{self.closer}")
         f.close()
     def __repr__(self):
         return self.opener + self.body + self.closer
@@ -250,13 +255,13 @@ def generateDependencGraph(events, streams):
 
         #reset to resimulate data from the beginning for each stram
         resetNodes(events)
-    g.write('./data')
+    g.write('./data.dot')
     return g
 
 
-def generateDependencGraphV2(events, streams):
+def generateDependencGraphV2(name, events, streams):
     streams.append(-1)
-    g = Graph(False, 'rectangle')
+    g = Graph(name, False, 'rectangle')
     
     previousKernel = None
     lastEvent = None
@@ -313,7 +318,7 @@ def generateDependencGraphV2(events, streams):
 
     #reset to resimulate data from the beginning for each stram
     
-    g.write('./data')
+    g.write()
     return g
 
 def generateStreams(tracepath):
@@ -510,13 +515,20 @@ def test(tracepath):
     for event in events:
         print(event)
 def main():
-    tracepath = '../luleshtraces'
-    streams = generateStreams(tracepath)
-    allocs = generateAllocations(tracepath)
-    events = generateEvents(tracepath, allocs)
+ 
 
+    tracepaths = next(os.walk('../traces'))[1]
+
+    for path in tracepaths:
+        tracepath = f'../traces/{path}'
+        streams = generateStreams(tracepath)
+        allocs = generateAllocations(tracepath)
+        events = generateEvents(tracepath, allocs)
+        generateDependencGraphV2(str(path), events, streams)  
     #g = generateDependencGraph(events, streams)
-    g = generateDependencGraphV2(events, streams)
+    
+  
+   
     #test(tracepath)
 
 

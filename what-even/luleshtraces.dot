@@ -1,4 +1,4 @@
-digraph G{
+digraph luleshtraces{
 k33 [label=k33 color=chartreuse4 shape=rectangle];k35 [label=k35 color=chartreuse4 shape=rectangle];
 k33 -> k35;
 k35 [label=k35 color=chartreuse4 shape=rectangle];k37 [label=k37 color=chartreuse4 shape=rectangle];
