@@ -77,6 +77,9 @@ class Pair():
         return f"{self.node1} ==> {self.node2}"
 
 class HtDPair(Pair):
+    def reset(self):
+        self.node1.iteration = 0
+        self.node2.iteration = 0
     def updateNodes(self):
         self.node2.iteration += 1
     def _init__ (self, node1=None, node2=None):
@@ -85,6 +88,9 @@ class HtDPair(Pair):
         return f"HtD : {self.node1} ==> {self.node2}"
 
 class DtHPair(Pair):
+    def reset(self):
+        self.node1.iteration = 0
+        self.node2.iteration = 0
     def updateNodes(self):
         self.node1.iteration += 1
         self.node2.iteration += 1
@@ -94,6 +100,9 @@ class DtHPair(Pair):
         return f"DtH : {self.node1} ==> {self.node2}"
 
 class DtDPair(Pair):
+    def reset(self):
+        self.node1.iteration = 0
+        self.node2.iteration = 0
     def updateNodes(self):
         self.node2.iteration += 1
     def __init__(self, node1=None, node2=None):
@@ -183,8 +192,10 @@ def resetNodes(events):
 
 #generates dependencies based on parsed events. returns a dependency grpah
 def generateDependencGraph(events, streams):
+    streams.append(-1)
     g = Graph(False, 'rectangle')
     for knownStream in streams:
+        print(f"========== ...STREAM {knownStream}... ==========")
         previousKernel = None
         lastEvent = None
         preMemoryNodes: list[Pair] = []
@@ -192,6 +203,7 @@ def generateDependencGraph(events, streams):
             if type(event) == kernelNode and event.stream == knownStream and type(lastEvent) == kernelNode:
                 g.add_edge(lastEvent, event)
                 lastEvent = event
+                print(event)
                 
             elif type(event) == kernelNode and event.stream == knownStream:
                 for e in preMemoryNodes:
@@ -201,37 +213,39 @@ def generateDependencGraph(events, streams):
                 preMemoryNodes.clear()
                 previousKernel = event
                 lastEvent = event
+                print(event)
 
             if type(event) == DtHPair and previousKernel != None:
                 stream = -1
                 if type(event.node1) == deviceMemoryNode:
                     stream = event.node1.stream
                 if stream == knownStream:
-                    print("HUUUH")
                     event.updateNodes()
                     g.add_edge(previousKernel, event.node1)
                     g.add_edge(event.node1, event.node2)
                     lastEvent = event
+                    print(event)
 
             elif type(event) == HtDPair:
                 stream = -1
                 if type(event.node2) == deviceMemoryNode:
                     stream = event.node2.stream
                 if stream == knownStream:
-                    print("HEEEH")
                     preMemoryNodes.append(event)
                     lastEvent = event
+                    print(event)
+
 
             elif type(event)== DtDPair:
                 if type(event.node1) == deviceMemoryNode:
                     stream = event.node1.stream
                 if stream == knownStream:
-                    print("HAAAH")
                     if previousKernel != None:
                         event.updateNodes()
                         g.add_edge(previousKernel, event.node1)
                     g.add_edge(event.node1, event.node2)
                     lastEvent = event
+                    print(event)
 
         #reset to resimulate data from the beginning for each stram
         resetNodes(events)
@@ -432,10 +446,13 @@ def test(tracepath):
     for event in events:
         print(event)
 def main():
-    tracepath = '../luleshtraces'
+    tracepath = '../streamtraces'
     streams = generateStreams(tracepath)
     allocs = generateAllocations(tracepath)
     events = generateEvents(tracepath, allocs)
+
+    for event in events:
+        print(event)
     g = generateDependencGraph(events, streams)
     #test(tracepath)
 
