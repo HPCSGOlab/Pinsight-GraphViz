@@ -11,7 +11,7 @@ In order to generate the graphs, execute run.sh inside of the /src folder. The s
 ex. graphs will be generated for both reductiontraces and streamtraces below
 
 traces
-├── reductiontraces 
-└── streamtraces 
+├── reductiontraces
+└── streamtraces
 ```
 
