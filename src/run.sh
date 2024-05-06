@@ -2,6 +2,7 @@
 #cleanup old files
 rm *.dot
 rm *.svg
+rm debug.log
 
 python3 main.py &> debug.log
 

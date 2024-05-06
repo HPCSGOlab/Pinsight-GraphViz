@@ -1,1 +1,0 @@
-/home/eingram4/Documents/cuda/pinsight/scripts/trace.sh /home/eingram4/Documents/cuda/cuda-paralell-add/trace  testtraces /home/eingram4/Documents/cuda/pinsight/build/libpinsight.so /usr/local/cuda/lib64 /home/eingram4/Documents/cuda/cuda-paralell-add/main 
