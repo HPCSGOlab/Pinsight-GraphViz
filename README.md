@@ -1,4 +1,4 @@
-# Pinsight-GraphViz: Dependecy graph generation tool
+# Pinsight-GraphViz: Dependancy graph generation tool
 
 This tool is designed to generate dependency CUDA graphs from traces collected with the [pinsight](https://github.com/passlab/pinsight) tool. We use the GraphViz visualization software to generate the dependecy graphs.
 
